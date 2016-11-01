@@ -111,6 +111,7 @@ for row in wkreader:
                         if res.headers['Content-Type'] == 'application/json':
                             rootLogger.warn(dict(res.json()))
                             sleep(SLEEP_TIME)  # wait for downloading again
+                            numtry+=1
                             continue
                         filename= str(res.headers['content-disposition']).rsplit('"')[1]
                         with open (filename,'wb') as fdw:
