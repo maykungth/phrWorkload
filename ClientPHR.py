@@ -5,16 +5,16 @@ from requests.packages import urllib3
 urllib3.disable_warnings()
 
 ## Setup Parameter ##
-WORKLOAD = '/home/hduser/workspace/phr_client/workload1/workload1_0.5_dis.csv'
+WORKLOAD = '/home/hduser/workspace/phr_client/workload/workloadx_0.75_uniform.csv'
 UPLOAD_DIR = '/home/hduser/workspace/phr_client/enc_files'
 UPLOAD_LOG = 'upload_log.csv'
 
 user_pass={'user':'system1@example.com','pass':'system1'}
 cert_path='/home/hduser/workspace/sslcert/ssl_DSePHR.crt' 
-DSePHR_SERV='Master'
+DSePHR_SERV='www.phrapi.com'
 DSePHR_PORT='50000'
 MAX_TRY = 10
-SLEEP_TIME = 2
+SLEEP_TIME = 5
 ## End Setup Parameter ##
 
 # Set Log to stderr and file
@@ -44,7 +44,7 @@ else:
 # Client Login to the system and get Token_key
 
 r = requests.post("https://{}:{}/login".format(DSePHR_SERV,DSePHR_PORT), data=json.dumps({'email':user_pass['user'],
-'password':user_pass['pass']}), headers={'content-type': 'application/json'},verify=cert_path)
+'password':user_pass['pass']}), headers={'content-type': 'application/json'},verify=False)
 tokenkey = r.json()['response']['user']['authentication_token']
 
 # read files from WORKLOAD and upload or download
@@ -53,8 +53,8 @@ wkreader = csv.DictReader(csvfile,delimiter=',')
 
 count=0
 for row in wkreader:
-    if count == 100:
-        # How many read row
+    if count == 6000:
+        # How many read row from workload files
         break
     #print "{},{},{}".format(row['ops'],row['uid_sysid'],dict_file[row['name']])
     
@@ -71,7 +71,7 @@ for row in wkreader:
             try:
                 start = timeit.default_timer()
                 res = requests.post('https://{}:{}/upload'.format(DSePHR_SERV,DSePHR_PORT),files=files,data=payload,
-                                   headers={'Authentication-Token':tokenkey},verify=cert_path)
+                                   headers={'Authentication-Token':tokenkey},verify=False)
                 uptime = timeit.default_timer() - start
                 break
             except requests.exceptions.RequestException as e:
@@ -107,10 +107,11 @@ for row in wkreader:
                 while numtry <= MAX_TRY:
                     try:
                         start = timeit.default_timer()
-                        res = requests.get("https://{}:{}/download/{}".format(DSePHR_SERV,DSePHR_PORT,reader[ir][5]),headers={'Authentication-Token':tokenkey},verify=cert_path)
+                        res = requests.get("https://{}:{}/download/{}".format(DSePHR_SERV,DSePHR_PORT,reader[ir][5]),headers={'Authentication-Token':tokenkey},verify=False)
                         if res.headers['Content-Type'] == 'application/json':
                             rootLogger.warn(dict(res.json()))
-                            break
+                            sleep(SLEEP_TIME)  # wait for downloading again
+                            continue
                         filename= str(res.headers['content-disposition']).rsplit('"')[1]
                         with open (filename,'wb') as fdw:
                             for i in res.iter_content(1024):
