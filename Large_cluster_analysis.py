@@ -84,6 +84,7 @@ for csv_file in work_file:
     if 'bytes' not in csv_file:
         continue
     f = open(csv_file,"r")
+    f_out.write("########################################################################\n")
     f_out.write("FILE : {}\n".format(csv_file))
     reader = csv.DictReader(f,delimiter=',')
     dict_table={}
@@ -114,9 +115,15 @@ for csv_file in work_file:
         f_out.write("Bytes_OUT (MB/s)\n")
 
     max_time = max(dict_table,key=dict_table.get)
+    upper_max_time = max_time + timedelta(minutes=thres_time)
+    lower_max_time = max_time - timedelta(minutes=thres_time)
+    
     min_time = min(dict_table,key=dict_table.get)
-    f_out.write("MAX,{},{}\n".format(max_time,dict_table[max_time]))
-    f_out.write("MIN,{},{}\n".format(min_time,dict_table[min_time]))
+    upper_min_time = min_time + timedelta(minutes=thres_time)
+    lower_min_time = min_time - timedelta(minutes=thres_time)
+    
+    f_out.write("MAX,{},{:.3f}\n".format(max_time,dict_table[max_time]))
+    f_out.write("MIN,{},{:.3f}\n".format(min_time,dict_table[min_time]))
 
     # At this point we get max time and min time and we need to see what client do in this time
 
@@ -127,60 +134,108 @@ for csv_file in work_file:
     # 2016-10-22 20:00:32,995,INFO,write,3xray.png,u1093-s2-1477141232-13640f45-2b20-40e4-b2ce-93199117e0bd,sec:0.847,size:4099,#69
     # =========0=========,=1=,=2==,==3==,====4====,=====================5==================================,===6=====,====7====,=8=    
 
-    dict_files_write_all_max_time = {}
-    dict_files_read_all_max_time = {}
+    dict_files_max_time = { 'write':{'type1':{},'type2':{},'type3':{}},
+                            'read':{'type1':{},'type2':{},'type3':{}}}
 
-    dict_files_write_all_min_time = {}
-    dict_files_read_all_min_time = {}
-
+    dict_files_min_time = { 'write':{'type1':{},'type2':{},'type3':{}},
+                            'read':{'type1':{},'type2':{},'type3':{}}}
+    
     for csv_file in list_client_file:
         f = open(csv_file,"r")
         #f_out.write("LOG,{}\n".format(csv_file.split("\\")[-1]))
         n_client = csv_file.split('\\')[-1].split('_')[-1].split('.')[0]
         reader= csv.reader(f,delimiter=',')
         for row in reader:
-            time=datetime.strptime(row[0],"%Y-%m-%d %H:%M:%S")
+            time_finish = datetime.strptime("{}.{}".format(row[0],row[1]),"%Y-%m-%d %H:%M:%S.%f")
+            time_start = time_finish - timedelta(seconds=float(row[6].split(":")[1]))
+            ops = str(row[3])
+
             # max time period
-            if max_time - timedelta(minutes=thres_time) <= time <= max_time + timedelta(minutes=thres_time):
-                #f_out.write("{},{},{},{},{},{}\n".format(row[0],row[2],row[3],row[4],row[6],row[8]))
-                if row[2] == 'INFO' and row[3] == 'write':
-                    dict_files_write_all_max_time = add_item(dict_item=dict_files_write_all_max_time,row=row,csv_file=csv_file)
-                if row[2] == 'INFO' and row[3] == 'read':
-                    dict_files_read_all_max_time = add_item(dict_item=dict_files_read_all_max_time,row=row,csv_file=csv_file)
+           
+            if row[2] == 'INFO' and (ops == 'write' or ops == 'read'):
+                if time_start < lower_max_time <= time_finish <= upper_max_time :
+                    # type1 = item start ops before lower_max_time and finish in range of considering time
+                    dict_files_max_time[ops]['type1'] = add_item(dict_item=dict_files_max_time[ops]['type1'],row=row,csv_file=csv_file)
+                elif lower_max_time <= time_start <= upper_max_time:
+                    #print time_start,time_finish
+                    # type2 = item start ops in range of considering time
+                    dict_files_max_time[ops]['type2'] = add_item(dict_item=dict_files_max_time[ops]['type2'],row=row,csv_file=csv_file)
+                elif upper_max_time <= time_start <= upper_max_time + timedelta(minutes=thres_time):
+                    # type3 = item start ops after upper_max_time and continue thres_time
+                    dict_files_max_time[ops]['type3'] = add_item(dict_item=dict_files_max_time[ops]['type3'],row=row,csv_file=csv_file)
 
             # min time period
-            elif min_time - timedelta(minutes=thres_time) <= time <= min_time + timedelta(minutes=thres_time):
-                #f_out.write("{},{},{},{},{},{}\n".format(row[0],row[2],row[3],row[4],row[6],row[8]))
-                if row[2] == 'INFO' and row[3] == 'write':
-                    dict_files_write_all_min_time = add_item(dict_item=dict_files_write_all_min_time,row=row,csv_file=csv_file)
+            
+            if row[2] == 'INFO' and (ops == 'write' or ops == 'read'):
+                if time_start < lower_min_time <= time_finish <= upper_min_time :
+                    # type1 = item start ops before lower_min_time and finish in range of considering time
+                    dict_files_min_time[ops]['type1'] = add_item(dict_item=dict_files_min_time[ops]['type1'],row=row,csv_file=csv_file)
+                elif lower_min_time <= time_start <= upper_min_time:
+                    #print time_start,time_finish
+                    # type2 = item start ops in range of considering time
+                    dict_files_min_time[ops]['type2'] = add_item(dict_item=dict_files_min_time[ops]['type2'],row=row,csv_file=csv_file)
+                elif upper_min_time <= time_start <= upper_min_time + timedelta(minutes=thres_time):
+                    # type3 = item start ops after upper_min_time and continue thres_time
+                    dict_files_min_time[ops]['type3'] = add_item(dict_item=dict_files_min_time[ops]['type3'],row=row,csv_file=csv_file)
 
-                if row[2] == 'INFO' and row[3] == 'read':
-                    dict_files_read_all_min_time = add_item(dict_item=dict_files_read_all_min_time,row=row,csv_file=csv_file)
         f.close()
     
-    # print "lens of all write {}\n lens of all read {}\n".format(len(dict_files_write_all_max_time),len(dict_files_read_all_max_time))
-    # def create_table(dict_item,f_out,label,type_ops=""):
-    create_table(dict_item=dict_files_write_all_max_time,f_out=f_out,
-                label="LOG: At Max time ALL Client {} +- {} minutes".format(max_time,thres_time),
+    # print "lens of all write {}\n lens of all read {}\n".format(len(dict_files_max_time),len(dict_files_read_all_max_time))
+    
+    ####### MAX TIME #######
+    f_out.write("LOG: At MAX time ALL Client {} +- {} minutes\n".format(max_time,thres_time))
+    # WRITE
+    create_table(dict_item=dict_files_max_time['write']['type1'],f_out=f_out,
+                label="TYPE 1: time_start < lower_time <= time_finish <= upper_time ",
                 type_ops = "write"
                 )
-
-    create_table(dict_item=dict_files_read_all_max_time,f_out=f_out,
-                label="",
-                type_ops = "read"
-                )
-
-    create_table(dict_item=dict_files_write_all_min_time,f_out=f_out,
-                label="LOG: At Min time ALL Client {} +- {} minutes".format(min_time,thres_time),
+    create_table(dict_item=dict_files_max_time['write']['type2'],f_out=f_out,
+                label="TYPE 2: lower_time <= time_start <= upper_time",
                 type_ops = "write"
                 )
-    create_table(dict_item=dict_files_read_all_min_time,f_out=f_out,
-                label="",
+    create_table(dict_item=dict_files_max_time['write']['type3'],f_out=f_out,
+                label="TYPE 3: upper_time <= time_start <= upper_time + thres_time",
+                type_ops = "write"
+                )
+    # READ
+    create_table(dict_item=dict_files_max_time['read']['type1'],f_out=f_out,
+                label="TYPE 1: time_start < lower_time <= time_finish <= upper_time ",
                 type_ops = "read"
                 )
-
-
-
-
-
-
+    create_table(dict_item=dict_files_max_time['read']['type2'],f_out=f_out,
+                label="TYPE 2: lower_time <= time_start <= upper_time",
+                type_ops = "read"
+                )
+    create_table(dict_item=dict_files_max_time['read']['type3'],f_out=f_out,
+                label="TYPE 3: upper_time <= time_start <= upper_time + thres_time",
+                type_ops = "read"
+                )
+    
+    ####### MIN TIME #######
+    f_out.write("\nLOG: At MIN time ALL Client {} +- {} minutes\n".format(min_time,thres_time))
+    # WRITE
+    create_table(dict_item=dict_files_min_time['write']['type1'],f_out=f_out,
+                label="TYPE 1: time_start < lower_time <= time_finish <= upper_time ",
+                type_ops = "write"
+                )
+    create_table(dict_item=dict_files_min_time['write']['type2'],f_out=f_out,
+                label="TYPE 2: lower_time <= time_start <= upper_time",
+                type_ops = "write"
+                )
+    create_table(dict_item=dict_files_min_time['write']['type3'],f_out=f_out,
+                label="TYPE 3: upper_time <= time_start <= upper_time + thres_time",
+                type_ops = "write"
+                )
+    # READ
+    create_table(dict_item=dict_files_min_time['read']['type1'],f_out=f_out,
+                label="TYPE 1: time_start < lower_time <= time_finish <= upper_time ",
+                type_ops = "read"
+                )
+    create_table(dict_item=dict_files_min_time['read']['type2'],f_out=f_out,
+                label="TYPE 2: lower_time <= time_start <= upper_time",
+                type_ops = "read"
+                )
+    create_table(dict_item=dict_files_min_time['read']['type3'],f_out=f_out,
+                label="TYPE 3: upper_time <= time_start <= upper_time + thres_time",
+                type_ops = "read"
+                )
