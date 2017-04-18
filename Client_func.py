@@ -7,35 +7,52 @@ import numpy
 from matplotlib import pyplot as plt
 import itertools
 from StringIO import StringIO
-def gen_box_graph(dict_to_plot,filename):
+def gen_box_graph(dict_to_plot,filename,p95th=False):
     #dict_to_plot['write'][75]['12videobig.mp4']['client3_#123']
-    d = OrderedDict({'AVG':pd.Series(dict_to_plot['AVG'][filename].values())})
-
+    d = OrderedDict({'AVG':dict_to_plot['AVG'][filename].values()})
     collabel = ['AVG']
-    for per in dict_to_plot:
+    for per in sorted(dict_to_plot):
         # skip 50%
         if (per == 50) or per == 'AVG':
             continue
         collabel.append("{}%".format(per))
         d[per] = pd.Series(dict_to_plot[per][filename].values())
 
-    df = pd.DataFrame(d)
-    result_graph = df.plot.box(return_type='dict',showmeans=True,showfliers=False,widths=0.0,whis='range',whiskerprops={'linestyle':'-','linewidth':1}, capprops={'marker':'o'},grid=True)
-    mean_data = [ "{:.2f}".format(result_graph['means'][i].get_ydata()[0])  for i in xrange(len(result_graph['means'])) ]
-    min_data = [ "{:.2f}".format(result_graph['caps'][i].get_ydata()[0]) for i in xrange(0,len(result_graph['caps']),2) ]
-    max_data = [ "{:.2f}".format(result_graph['caps'][i].get_ydata()[0]) for i in xrange(1,len(result_graph['caps']),2) ]
+    
+    if p95th == False:
+        max_data = [ "{:.2f}".format(numpy.max(x)) for x in d.values() ]
+        rowlabel = ['Max','Mean','Min']
+    elif p95th == True:
+        max_data = [ "{:.2f}".format(numpy.percentile(x,95)) for x in d.values() ]
+        rowlabel = ['95th','Mean','Min']
+    mean_data = [ "{:.2f}".format(numpy.mean(x)) for x in d.values() ]
+    min_data = [ "{:.2f}".format(numpy.min(x)) for x in d.values() ]
 
-    plt.title("{}".format(filename))
-    plt.ylim(0,140)
+    #result_graph = df.plot.box(return_type='dict',showmeans=True,showfliers=True,widths=0.0,whis=whis_max,whiskerprops={'linestyle':'-','linewidth':1}, capprops={'marker':'o'},grid=True)
+    # mean_data = [ "{:.2f}".format(result_graph['means'][i].get_ydata()[0])  for i in xrange(len(result_graph['means'])) ]
+    # min_data = [ "{:.2f}".format(result_graph['caps'][i].get_ydata()[0]) for i in xrange(0,len(result_graph['caps']),2) ]
+    # max_data = [ "{:.2f}".format(result_graph['caps'][i].get_ydata()[0]) for i in xrange(1,len(result_graph['caps']),2) ]
+    # for i in xrange(len(result_graph['caps'])):
+    #     print result_graph['caps'][i].get_ydata()
+    ax = plt.subplot()
+    for x,val in enumerate(d.keys()):
+        ax.plot([x,x],[min_data[x],max_data[x]],marker='o',color='b')
+        ax.scatter(x,mean_data[x], marker='s',color='r')
+    ax.set_xticklabels(['0'] + collabel)
+    ax.set_xlim(-1,6)
+
+    plt.title("{}".format(filename.replace('sound.jpg','sound.mp3')))
+    
+    #plt.axis([-1,6,0,120])
     plt.xlabel('% Resouce Usage')
     plt.ylabel('Time (s)')
     plt.subplots_adjust( bottom=0.25)
     cell_text = [max_data,mean_data,min_data]
     the_table = plt.table(cellText=cell_text,
-                        rowLabels=['Max','Mean','Min'],
+                        rowLabels=rowlabel,
                         colLabels=collabel,
                         loc='bottom',bbox=[0.05,-0.32,0.95,0.2])
-    
+    plt.grid()
     plt.show()
 
 def gen_graph(name_graph,y_axis_data,show=False):
